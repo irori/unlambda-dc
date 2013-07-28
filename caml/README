@@ -1,0 +1,35 @@
+This directory contains an Unlambda interpreter written in CAML (an ML
+variant developped at the INRIA, http://www.inria.fr/ ).  See
+http://caml.inria.fr/ for more information about CAML.  It is thought
+that any version of CAML (or, at any rate, of OCAML) will compile
+this, but the INRIA is not very keen on upward compatibility (to say
+the least): this has been tested with OCAML version 2.02 (see
+http://pauillac.inria.fr/ocaml/ for downloading OCAML; since version
+2.03, OCAML is - presumably - free software).
+
+
+To compile (using OCAML), run
+
+  ocamlc -o unlambda unlambda.ml
+
+or replace ocamlc by ocamlopt if your architecture (e.g. Intel or
+Sparc) is supported as a native compilation target by OCAML.
+
+
+To run, run
+
+  ./unlambda < inputfile.unl
+
+(I would have liked to permit reading the file name from the command
+line, but I didn't have the OCAML manual with me, so that wasn't
+possible, and I was in a hurry; sorry).
+
+
+This interpreter is distributed under the terms of the GNU Lesser
+General Public License (either version 2.1 of the license, or, at your
+option, any later version).  The reason for this is that it is not
+certain whether linking a GPL'ed CAML program with the OCAML run-time
+library (version 2.02 or less) is permitted, and I don't want to make
+a special arrangement.  As this interpreter is derived from the
+interpreter in SML/NJ, the latter is also put under the same license,
+for coherence's sake.
