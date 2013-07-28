@@ -44,8 +44,11 @@ struct function_s {
     FUNCTION_D1,
     FUNCTION_D,
     FUNCTION_CONT,
+    FUNCTION_DCONT,
     FUNCTION_C,
     FUNCTION_E,
+    FUNCTION_P,
+    FUNCTION_F,
     FUNCTION_AT,
     FUNCTION_QUES,
     FUNCTION_PIPE
@@ -83,6 +86,7 @@ struct continuation_s {
     CONTINUATION_APP1,
     CONTINUATION_APP,
     CONTINUATION_DEL,
+    CONTINUATION_ABORT,
     CONTINUATION_FINAL
   } t;
   union {
@@ -107,6 +111,7 @@ struct task_s {
     TASK_EVAL,
     TASK_APP1,
     TASK_APP,
+    TASK_INVOKE,
     TASK_FINAL
   } t;
   union {
@@ -123,7 +128,16 @@ struct task_s {
       struct function_s *erator, *erand;
       struct continuation_s *cont;
     } task_app_v;
+    struct {
+      struct continuation_s *cont;
+      struct function_s *val;
+    } task_invoke_v;
   } d;
+};
+
+struct continuation_list {
+  struct continuation_s *cont;
+  struct continuation_list *next;
 };
 
 void
@@ -234,6 +248,7 @@ free_function (struct function_s *fun)
       release_expression (fun->d.function_d1_v);
       break;
     case FUNCTION_CONT:
+    case FUNCTION_DCONT:
       release_continuation (fun->d.function_cont_v);
       break;
     default:
@@ -306,6 +321,10 @@ free_task (struct task_s *task)
       release_function (task->d.task_app_v.erand);
       release_continuation (task->d.task_app_v.cont);
       break;
+    case TASK_INVOKE:
+      release_continuation (task->d.task_invoke_v.cont);
+      release_function (task->d.task_invoke_v.val);
+      break;
     default:
       ;
     }
@@ -329,6 +348,32 @@ init_ptr_ (struct generic_s **pptr, struct generic_s *ptr)
 	init_ptr_((struct generic_s **)pptr,(struct generic_s *)ptr)
 
 char current_ch = EOF;
+struct continuation_list *meta_cont;
+
+void
+push_cont (struct continuation_s* cont)
+{
+  struct continuation_list *elem = malloc (sizeof(struct continuation_list));
+  init_ptr (&elem->cont, cont);
+  elem->next = meta_cont;
+  meta_cont = elem;
+}
+
+struct continuation_s*
+pop_cont ()
+{
+  struct continuation_list *elem = meta_cont;
+  struct continuation_s* cont;
+  if (elem == NULL)
+    {
+      fprintf (stderr, "You forgot the top-level reset...\n");
+      exit (1);
+    }
+  cont = elem->cont;
+  meta_cont = elem->next;
+  free(elem);
+  return cont;
+}
 
 struct task_s *
 invoke (struct continuation_s *cont, struct function_s *val)
@@ -369,6 +414,17 @@ invoke (struct continuation_s *cont, struct function_s *val)
 		  cont->d.continuation_del_v.erand);
 	init_ptr (&task->d.task_app_v.cont,
 		  cont->d.continuation_del_v.cont);
+	return task;
+      }
+    case CONTINUATION_ABORT:
+      {
+	struct task_s *task = new_task ();
+	struct continuation_s *cont = pop_cont ();
+
+	task->t = TASK_INVOKE;
+	init_ptr (&task->d.task_invoke_v.cont, cont);
+	init_ptr (&task->d.task_invoke_v.val, val);
+	release_continuation(cont);
 	return task;
       }
     case CONTINUATION_FINAL:
@@ -503,6 +559,22 @@ apply (struct function_s *rator, struct function_s *rand,
       }
     case FUNCTION_CONT:
       return invoke (rator->d.function_cont_v, rand);
+    case FUNCTION_DCONT:
+      {
+	struct function_s *val = new_function ();
+	struct task_s *task = new_task ();
+	struct continuation_s *ncont = new_continuation ();
+
+	push_cont (cont);
+	val->t = FUNCTION_CONT;
+	init_ptr (&val->d.function_cont_v, rator->d.function_cont_v);
+	task->t = TASK_APP;
+	ncont->t = CONTINUATION_ABORT;
+	init_ptr (&task->d.task_app_v.erator, val);
+	init_ptr (&task->d.task_app_v.erand, rand);
+	init_ptr (&task->d.task_app_v.cont, ncont);
+	return task;
+      }
     case FUNCTION_C:
       {
 	struct function_s *val = new_function ();
@@ -517,6 +589,36 @@ apply (struct function_s *rator, struct function_s *rand,
 #if 0  /* Harmless but not necessary */
 	free_function (val);
 #endif
+	return task;
+      }
+    case FUNCTION_P:
+      {
+	struct function_s *val = new_function ();
+	struct task_s *task = new_task ();
+	struct continuation_s *ncont = new_continuation ();
+
+	push_cont (cont);
+	val->t = FUNCTION_I;
+	task->t = TASK_APP;
+	ncont->t = CONTINUATION_ABORT;
+	init_ptr (&task->d.task_app_v.erator, rand);
+	init_ptr (&task->d.task_app_v.erand, val);
+	init_ptr (&task->d.task_app_v.cont, ncont);
+	return task;
+      }
+    case FUNCTION_F:
+      {
+	struct function_s *val = new_function ();
+	struct task_s *task = new_task ();
+	struct continuation_s *ncont = new_continuation ();
+
+	val->t = FUNCTION_DCONT;
+	init_ptr (&val->d.function_cont_v, cont);
+	task->t = TASK_APP;
+	ncont->t = CONTINUATION_ABORT;
+	init_ptr (&task->d.task_app_v.erator, rand);
+	init_ptr (&task->d.task_app_v.erand, val);
+	init_ptr (&task->d.task_app_v.cont, ncont);
 	return task;
       }
     case FUNCTION_E:
@@ -652,6 +754,8 @@ run (struct task_s *task)
     case TASK_APP:
       return apply (task->d.task_app_v.erator, task->d.task_app_v.erand,
 		    task->d.task_app_v.cont);
+    case TASK_INVOKE:
+      return invoke (task->d.task_invoke_v.cont, task->d.task_invoke_v.val);
     case TASK_FINAL:
       /* Should not happen */;
     }
@@ -767,7 +871,33 @@ parse (FILE *input)
       struct function_s *fun = new_function ();
       struct expression_s *expr = new_expression ();
 
-      fun->t = FUNCTION_C;
+      fun->t = FUNCTION_E;
+      expr->t = EXPRESSION_FUNCTION;
+      init_ptr (&expr->d.expression_function_v, fun);
+#if 0  /* Harmless but not necessary */
+      free_function (fun);
+#endif
+      return expr;
+    }
+  else if ( ch == 'p' || ch == 'P' )
+    {
+      struct function_s *fun = new_function ();
+      struct expression_s *expr = new_expression ();
+
+      fun->t = FUNCTION_P;
+      expr->t = EXPRESSION_FUNCTION;
+      init_ptr (&expr->d.expression_function_v, fun);
+#if 0  /* Harmless but not necessary */
+      free_function (fun);
+#endif
+      return expr;
+    }
+  else if ( ch == 'f' || ch == 'F' )
+    {
+      struct function_s *fun = new_function ();
+      struct expression_s *expr = new_expression ();
+
+      fun->t = FUNCTION_F;
       expr->t = EXPRESSION_FUNCTION;
       init_ptr (&expr->d.expression_function_v, fun);
 #if 0  /* Harmless but not necessary */

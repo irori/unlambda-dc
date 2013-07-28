@@ -14,14 +14,25 @@ and funktion =
 	| D1 of expression
 	| D
 	| Cont of (funktion->unit)
+	| Dcont of (funktion->unit)
 	| C
 	| E
+	| P
+	| F
 	| At
 	| Ques of char
 	| Pipe
 ;;
 
 let current_ch = ref (None : char option);;
+
+exception NoTopLevelReset;;
+
+let meta_cont = ref [];;
+
+let abort v = match !meta_cont with
+    [] -> raise NoTopLevelReset
+  | cont::rest -> (meta_cont := rest; cont v);;
 
 let rec apply = function
 	  I -> (fun t -> fun cont -> cont t)
@@ -40,6 +51,11 @@ let rec apply = function
 	| C -> (fun t -> fun cont ->
 			 eval (Apply (Funktion t, Funktion (Cont cont))) cont)
 	| E -> (fun t -> fun cont -> exit 0)
+	| P -> (fun t -> fun cont -> reset (Apply (Funktion t, Funktion I)) cont)
+	| F -> (fun t -> fun cont ->
+	  eval (Apply (Funktion t, Funktion (Dcont cont))) abort)
+	| Dcont dcnt -> fun t -> fun cont ->
+	  reset (Apply (Funktion (Cont dcnt), Funktion t)) cont
 	| At -> (fun t -> fun cont ->
 			  (current_ch := (try Some (input_char stdin)
 ;					  with End_of_file -> None);
@@ -60,6 +76,9 @@ and eval = function
 	| Apply (rator, rand) -> fun cont -> eval rator (function D ->
 		  cont (D1 rand)
 		| erator -> eval rand (fun erand -> apply erator erand cont))
+and reset expr cont =
+	meta_cont := cont :: !meta_cont;
+	(eval expr abort)
 ;;
 
 exception ParseError;;
@@ -90,6 +109,10 @@ let rec parse = fun input ->
 	   | 'C' -> Funktion C
 	   | 'e' -> Funktion E
 	   | 'E' -> Funktion E
+	   | 'p' -> Funktion P
+	   | 'P' -> Funktion P
+	   | 'f' -> Funktion F
+	   | 'F' -> Funktion F
 	   | '.' -> Funktion (Dot (input_char input))
 	   | 'r' -> Funktion (Dot '\n')
 	   | '@' -> Funktion At
