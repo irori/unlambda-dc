@@ -130,5 +130,5 @@ let program = match Array.length Sys.argv with
   | _ -> raise (Failure "Expected zero or one argument")
 ;;
 
-eval program (fun x -> ())
+reset program (fun x -> ())
 ;;

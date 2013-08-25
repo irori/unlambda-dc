@@ -366,7 +366,7 @@ pop_cont ()
   struct continuation_s* cont;
   if (elem == NULL)
     {
-      fprintf (stderr, "You forgot the top-level reset...\n");
+      fprintf (stderr, "BUG: Control reached out of toplevel reset\n");
       exit (1);
     }
   cont = elem->cont;
@@ -1000,6 +1000,7 @@ main (int argc, char *argv[])
 {
   struct expression_s *expr;
   struct continuation_s *finis = new_continuation ();
+  struct continuation_s *cont = new_continuation ();
   struct task_s *task = new_task ();
 
   if ( argc == 1 )
@@ -1022,9 +1023,12 @@ main (int argc, char *argv[])
       exit (1);
     }
   finis->t = CONTINUATION_FINAL;
+  push_cont(finis);
+
+  cont->t = CONTINUATION_ABORT;
   task->t = TASK_EVAL;
   init_ptr (&task->d.task_eval_v.expr, expr);
-  init_ptr (&task->d.task_eval_v.cont, finis);
+  init_ptr (&task->d.task_eval_v.cont, cont);
   while ( task->t != TASK_FINAL )
     {
       struct task_s *next_task = run (task);
