@@ -25,7 +25,7 @@ let current_ch = ref (None : char option);;
 
 let rec apply = function
 	  I -> (fun t -> fun cont -> cont t)
-	| Dot ch -> (fun t -> fun cont -> print_char ch; cont t)
+	| Dot ch -> (fun t -> fun cont -> print_char ch; flush stdout; cont t)
 	| K1 v -> (fun t -> fun cont -> cont v)
 	| K -> (fun t -> fun cont -> cont (K1 t))
 	| S2 (x,y) -> (fun z -> fun cont ->
@@ -99,5 +99,13 @@ let rec parse = fun input ->
 	) (input_char input)
 ;;
 
-eval (parse stdin) (fun x -> ())
+let program = match Array.length Sys.argv with
+  | 1 -> parse stdin
+  | 2 -> let f = open_in Sys.argv.(1) in
+         let e = parse f in
+         close_in f; e
+  | _ -> raise (Failure "Expected zero or one argument")
+;;
+
+eval program (fun x -> ())
 ;;
