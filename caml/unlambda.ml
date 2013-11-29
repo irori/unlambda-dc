@@ -15,7 +15,6 @@ and funktion =
 	| D
 	| Cont of (funktion->unit)
 	| Dcont of (funktion->unit)
-	| C
 	| E
 	| P
 	| F
@@ -48,8 +47,6 @@ let rec apply = function
 	| D1 e -> (fun t -> fun cont -> eval (Apply (e, Funktion t)) cont)
 (*	| D -> raise your_expectations *)
 	| Cont cnt -> (fun t -> fun cont -> cnt t)
-	| C -> (fun t -> fun cont ->
-			 eval (Apply (Funktion t, Funktion (Cont cont))) cont)
 	| E -> (fun t -> fun cont -> exit 0)
 	| P -> (fun t -> fun cont -> reset (Apply (Funktion t, Funktion I)) cont)
 	| F -> (fun t -> fun cont ->
@@ -105,8 +102,6 @@ let rec parse = fun input ->
 	   | 'V' -> Funktion V
 	   | 'd' -> Funktion D
 	   | 'D' -> Funktion D
-	   | 'c' -> Funktion C
-	   | 'C' -> Funktion C
 	   | 'e' -> Funktion E
 	   | 'E' -> Funktion E
 	   | 'p' -> Funktion P

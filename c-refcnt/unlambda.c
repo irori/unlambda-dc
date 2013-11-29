@@ -45,7 +45,6 @@ struct function_s {
     FUNCTION_D,
     FUNCTION_CONT,
     FUNCTION_DCONT,
-    FUNCTION_C,
     FUNCTION_E,
     FUNCTION_P,
     FUNCTION_F,
@@ -575,22 +574,6 @@ apply (struct function_s *rator, struct function_s *rand,
 	init_ptr (&task->d.task_app_v.cont, ncont);
 	return task;
       }
-    case FUNCTION_C:
-      {
-	struct function_s *val = new_function ();
-	struct task_s *task = new_task ();
-
-	val->t = FUNCTION_CONT;
-	init_ptr (&val->d.function_cont_v, cont);
-	task->t = TASK_APP;
-	init_ptr (&task->d.task_app_v.erator, rand);
-	init_ptr (&task->d.task_app_v.erand, val);
-	init_ptr (&task->d.task_app_v.cont, cont);
-#if 0  /* Harmless but not necessary */
-	free_function (val);
-#endif
-	return task;
-      }
     case FUNCTION_P:
       {
 	struct function_s *val = new_function ();
@@ -846,19 +829,6 @@ parse (FILE *input)
       struct expression_s *expr = new_expression ();
 
       fun->t = FUNCTION_D;
-      expr->t = EXPRESSION_FUNCTION;
-      init_ptr (&expr->d.expression_function_v, fun);
-#if 0  /* Harmless but not necessary */
-      free_function (fun);
-#endif
-      return expr;
-    }
-  else if ( ch == 'c' || ch == 'C' )
-    {
-      struct function_s *fun = new_function ();
-      struct expression_s *expr = new_expression ();
-
-      fun->t = FUNCTION_C;
       expr->t = EXPRESSION_FUNCTION;
       init_ptr (&expr->d.expression_function_v, fun);
 #if 0  /* Harmless but not necessary */
